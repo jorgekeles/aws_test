@@ -30,5 +30,5 @@ sudo usermod -a -G docker-compose ec2-user
 #* make folders that docker-compose.yaml needs for volumes
 sudo mkdir /efs/db /efs/wordpress
 #* run docker-compose.yaml
-sudo git clone https://github.com/imohd23/aws_TerraPress.git /home/ec2-user/aws_TerraPress
-sudo docker-compose -f /home/ec2-user/aws_TerraPress/docker-compose.yaml up --build -d
+sudo git clone https://github.com/jorgekeles/aws_test.git /home/ec2-user/aws
+sudo docker-compose -f /home/ec2-user/aws/docker-compose.yaml up --build -d
