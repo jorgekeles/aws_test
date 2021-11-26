@@ -1,15 +1,6 @@
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnet_ids" "all" {
-  vpc_id = data.aws_vpc.default.id
-}
-
-data "aws_security_group" "default" {
-  vpc_id = data.aws_vpc.default.id
-  name   = "default"
-}
+#TODO list:
+# * add new az and new subnet so we can run ALB
+# * 
 
 data "aws_ami" "amazon_linux" {
   most_recent = true
@@ -32,195 +23,164 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
 
-//security group for EC2
+  name = "${var.vpc_name}example_1"
+  cidr = "10.0.0.0/16"
 
-resource "aws_security_group" "ec2_allow_rule" {
- 
+  azs                  = ["us-east-1a", "us-east-1b"]
+  private_subnets      = ["10.0.1.0/24"]
+  public_subnets       = ["10.0.101.0/24", "10.0.102.0/24"]
+  enable_dns_hostnames = true
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+  }
+
+}
+
+
+module "instance_sg" {
+  source = "terraform-aws-modules/security-group/aws"
+
+  name        = "user-service-sg"
+  description = "Security group for user-service with custom ports open within VPC, and PostgreSQL publicly open"
+  vpc_id      = module.vpc.vpc_id
   
-ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  ingress_with_cidr_blocks = [
+    {
+      rule        = "http-80-tcp"
+      cidr_blocks = "0.0.0.0/0"
+    },
+    {
+      rule        = "ssh-tcp"
+      cidr_blocks = "0.0.0.0/0"
+    },
+    {
+      rule        = "http-8080-tcp",
+      cidr_blocks = "0.0.0.0/0"
+    }
+  ]
+  egress_with_cidr_blocks = [
+    {
+      rule        = "all-all"
+      cidr_blocks = "0.0.0.0/0"
+    }
+  ]
+}
 
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+module "efs_sg" {
+  #* EFS Security Group
+  
+  source = "terraform-aws-modules/security-group/aws"
 
-   ingress {
-    description = "MYSQL/Aurora"
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  name        = "user-nimbux-service-sg-efs"
+  description = "Security group for user-service with custom ports open within VPC, and PostgreSQL publicly open"
+  vpc_id      = module.vpc.vpc_id
 
-ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  number_of_computed_ingress_with_source_security_group_id = 1
+  computed_ingress_with_source_security_group_id = [
+    {
+      rule                     = "nfs-tcp"
+      source_security_group_id = module.instance_sg.security_group_id
+    }
+  ]
+  egress_with_cidr_blocks = [
+    {
+      rule        = "all-all"
+      cidr_blocks = "0.0.0.0/0"
+    }
+  ]
+}
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_key_pair" "ec2key" {
+  key_name   = var.public_key_name
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCotaFXhBfNDkXkpSc19j9m2vHAqWKp90IlQ/18KFbc9ZZAK2e70bYKBlpaBFhDMtkG2ZfkLZQCjhVgwFm/4JM7bmoiz2Rmc/lLOCrjzIY6saDnwlba975K8oto+FlaXU/5jr8YsU/c4TIIZU7g33hifEuA79KyvCPGIdIFtGe39JgaIMQKlLANIA62WZEMwxym4cpjMJcO4pph5QfVhvtFilbtjl0qLfkqAQ/2tMPVG5ymhot2WQcnoHfDIpfsk7PwWeYNtsSr/VpU90QwqcoRAdAcX0+GwBMBi01rT26S9GtItD3xzW3X0izJs1XXbpBKZCcKRcoBzHyb9cPTfJsz jorgekeles@CPX-JTI1HV9NQDP"
+}
 
+resource "aws_efs_file_system" "efs" {
+  creation_token = "${var.vpc_name}efs"
+  encrypted      = true
   tags = {
-    Name = "allow ssh,http,https"
+    Name = "${var.vpc_name}efs"
   }
 }
 
-
-# Security group for RDS
-resource "aws_security_group" "RDS_allow_rule" {
-
-  ingress {
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = ["${aws_security_group.ec2_allow_rule.id}"]
-  }
-  # Allow all outbound traffic.
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  tags = {
-    Name = "allow ec2"
-  }
-
+resource "aws_efs_mount_target" "efs_mount" {
+  file_system_id  = aws_efs_file_system.efs.id
+  subnet_id       = module.vpc.public_subnets[0]
+  security_groups = [module.efs_sg.security_group_id]
 }
 
-# Create RDS instance
-resource "aws_db_instance" "wordpressdb" {
-  allocated_storage    = 10
-  engine               = "mysql"
-  engine_version       = "5.7"
-  instance_class       = "db.t3.micro"
-  vpc_security_group_ids      =["${aws_security_group.RDS_allow_rule.id}"]
-  name                 = "${var.database_name}"
-  username             = "${var.database_user}"
-  password             = "${var.database_password}"
-  skip_final_snapshot  = true
+resource "aws_efs_access_point" "efs_access_point" {
+  file_system_id = aws_efs_file_system.efs.id
 }
 
-# change USERDATA varible value after grabbing RDS endpoint info
-data "template_file" "user_data" {
-  template = "${file("${path.module}/user_data.tpl")}"
+#* script to setup the instance
+data "template_file" "init" {
+  template = file("script.tpl")
   vars = {
-    db_username="${var.database_user}"
-    db_user_password="${var.database_password}"
-    db_name="${var.database_name}"
-    db_RDS="${aws_db_instance.wordpressdb.endpoint}"
+    efs_id              = aws_efs_file_system.efs.id
+    efs_mount_id        = aws_efs_mount_target.efs_mount.id
+    efs_access_point_id = aws_efs_access_point.efs_access_point.id
   }
 }
 
-/* 
-# Create EC2 ( only after RDS is provisioned)
-resource "aws_instance" "wordpressec2" {
-  ami=data.aws_ami.amazon_lin.id
-  instance_type="${var.instance_type}"
-  security_groups=["${aws_security_group.ec2_allow_rule.name}"]
-  user_data = "${data.template_file.user_data.rendered}"
-  key_name="${var.key_name}"
-  tags = {
-    Name = "Wordpress.web"
-  }
 
-  # this will stop creating EC2 before RDS is provisioned
-  depends_on = [aws_db_instance.wordpressdb]
-}
-
-
- */
-
-
-
-
-
-module "asg" {
+module "auto_scaling" {
   source  = "terraform-aws-modules/autoscaling/aws"
   version = "~> 3.0"
-  
-  name = "wordpress"
+
+  name = "${var.vpc_name}auto_scaling"
 
   # Launch configuration
-  lc_name = "example-lc"
+  lc_name = "${var.vpc_name}auto_scaling_lc"
 
   image_id        = data.aws_ami.amazon_linux.id
-  instance_type   = "t2.micro"
-  security_groups = [resource.aws_security_group.ec2_allow_rule.id]
+  instance_type   = var.instance_type
+  security_groups = [module.instance_sg.security_group_id]
 
   ebs_block_device = [
     {
       device_name           = "/dev/xvdz"
       volume_type           = "gp2"
-      volume_size           = "50"
+      volume_size           = "8"
       delete_on_termination = true
     },
   ]
 
-  root_block_device = [
-    {
-      volume_size = "50"
-      volume_type = "gp2"
-    },
-  ]
 
   # Auto scaling group
-  asg_name                  = "example-asg"
-  depends_on                = [data.aws_ami.amazon_linux, resource.aws_security_group.ec2_allow_rule]
-  vpc_zone_identifier       = data.aws_subnet_ids.all.ids
+  asg_name                  = "${var.vpc_name}auto_scaling_lc"
+  vpc_zone_identifier       = [module.vpc.public_subnets[0]]
   health_check_type         = "EC2"
-  min_size                  = 0
+  min_size                  = 2
   max_size                  = 5
   desired_capacity          = 2
   wait_for_capacity_timeout = 0
+  user_data                 = data.template_file.init.rendered
+  key_name                  = aws_key_pair.ec2key.key_name
 
   tags = [
     {
       key                 = "Environment"
-      value               = "dev"
+      value               = "Dev"
       propagate_at_launch = true
-    },
-    {
-      key                 = "Project"
-      value               = "megasecret"
-      propagate_at_launch = true
-    },
+    }
   ]
 
-  tags_as_map = {
-    extra_tag1 = "extra_value1"
-    extra_tag2 = "extra_value2"
-  }
 }
 
+module "elb_http" {
+  source  = "terraform-aws-modules/elb/aws"
+  version = "~> 2.0"
 
-######
-# ELB
-######
-module "elb" {
-  source = "terraform-aws-modules/elb/aws"
+  name = "elb-nimbux"
 
-  name = "elb-example"
-
-  subnets         = data.aws_subnet_ids.all.ids
-  security_groups = [resource.aws_security_group.ec2_allow_rule.id]
+  subnets         = [module.vpc.public_subnets[0], module.vpc.public_subnets[1]]
+  security_groups = [module.instance_sg.security_group_id]
   internal        = false
 
   listener = [
@@ -234,29 +194,17 @@ module "elb" {
 
   health_check = {
     target              = "HTTP:80/"
-    interval            = 30
+    interval            = 300
     healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
+    unhealthy_threshold = 5
+    timeout             = 60
   }
-
-  tags = {
-    Owner       = "user"
-    Environment = "dev"
-  }
-} 
-
-/* 
-# creating Elastic IP for EC2
-resource "aws_eip" "eip" {
-  instance = aws_instance.wordpressec2.id
   
+
 }
 
-output "IP" {
-    value = aws_eip.eip.public_ip
+resource "aws_autoscaling_attachment" "asg_attachment_bar" {
+  autoscaling_group_name = module.auto_scaling.this_autoscaling_group_id
+  elb                    = module.elb_http.this_elb_id
 }
-output "RDS-Endpoint" {
-    value = aws_db_instance.wordpressdb.endpoint
-}
- */
+
