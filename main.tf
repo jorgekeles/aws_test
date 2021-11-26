@@ -97,7 +97,7 @@ module "efs_sg" {
 
 resource "aws_key_pair" "ec2key" {
   key_name   = var.public_key_name
-  public_key = "" #TODO complete with your key
+  public_key = file(var.public_key_path) #TODO complete with your key
 }
 
 resource "aws_efs_file_system" "efs" {
