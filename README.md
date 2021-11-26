@@ -13,8 +13,8 @@ This Module contains:
 # Inputs
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-database_name | The name of the data base | n/a | string | YES
-database_user | The user name for the database | n/a | string | YES
+cidr_vpc | Classless Inter-Domain Routing for VPC | string | "10.1.0.0/16" | NO
+cidr_subnet | Classless Inter-Domain Routing for subnet | string | "10.1.0.0/24" | NO
 shared_credentials_file | Access key location | n/a | string | YES
 region | The region to host the servers | us-west-2 | string | NO
 key_name | Name of the key | n/a | string | YES
