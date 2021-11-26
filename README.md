@@ -15,11 +15,14 @@ This Module contains:
 |------|-------------|------|---------|:--------:|
 cidr_vpc | Classless Inter-Domain Routing for VPC | string | "10.1.0.0/16" | NO
 cidr_subnet | Classless Inter-Domain Routing for subnet | string | "10.1.0.0/24" | NO
-shared_credentials_file | Access key location | n/a | string | YES
-region | The region to host the servers | us-west-2 | string | NO
-key_name | Name of the key | n/a | string | YES
-instance_type | The instance type for the cluster | t2.micro | string | NO
+availability_zone | Location inside the Region | string | "us-east-1a" | NO
+region | The region to host the servers | string | us-east-1 | NO
+public_key_name | Name of the ssh pub key | string | n/a | YES
+instance_type | The instance type for the cluster | string | t2.micro | NO
+vpc_name | The name for the VPC | string | "nimbux_test_" NO
+environment_tag | Label for environment | string | "Development" | NO
 
 ## aws_test
 
-This sample is used to create an example of EC2 servers with 2 entries for the minimum and 5 for the maximum and creates a MYSQL database on AWS RDS. EC2 instances run within Auto Scaling group created by [asg module](https://github.com/terraform-aws-modules/terraform-aws-autoscaling) and for the Load Balancer uses [elb](https://github.com/terraform-aws-modules/terraform-aws-elb)
+This sample is used to create an example of EC2 servers with 2 entries for the minimum and 5 for the maximum and creates a MYSQL database on AWS RDS. EC2 instances run within Auto Scaling group created by [auto_scaling module](https://github.com/terraform-aws-modules/terraform-aws-autoscaling) and for the Load Balancer uses [elb_http module](https://github.com/terraform-aws-modules/terraform-aws-elb). The security group was created by [instance_sg](https://github.com/terraform-aws-modules/terraform-aws-security-group) and all the resources for EFS.
+To execute this script you must complete the variable `public key` from where the script will run.

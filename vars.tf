@@ -31,7 +31,4 @@ variable "vpc_name" {
   description = "the prefix of the vpc name"
   default     = "nimbux_test_"
 }
-variable "instance_count" {
-  description = "The number of instances to be launched"
-  default     = 2
-}
+
