@@ -10,10 +10,10 @@ variable "availability_zone" {
   description = "availability zone to create subnet"
   default     = "us-east-1a"
 }
-/* variable "public_key_path" {
+variable "public_key_path" {
   description = "Public key path"
   #default     = "path of the key" TODO complete
-} */
+} 
 variable "public_key_name" {
   description = "Public key name"
   default     = "id_rsa.pub"
