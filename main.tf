@@ -27,11 +27,11 @@ module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
   name = "${var.vpc_name}example_1"
-  cidr = "10.0.0.0/16"
+  cidr = var.cidr_vpc
 
-  azs                  = ["us-east-1a", "us-east-1b"]
-  private_subnets      = ["10.0.1.0/24"]
-  public_subnets       = ["10.0.101.0/24", "10.0.102.0/24"]
+  azs                  = [var.availability_zone]
+  private_subnets      = [cidrsubnet(var.cidr_vpc, 8 ,8)]
+  public_subnets       = [cidrsubnet(var.cidr_vpc, 8, 101 )]
   enable_dns_hostnames = true
 
   tags = {
@@ -97,7 +97,7 @@ module "efs_sg" {
 
 resource "aws_key_pair" "ec2key" {
   key_name   = var.public_key_name
-  public_key = file(var.public_key_path) #TODO complete with your key
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCotaFXhBfNDkXkpSc19j9m2vHAqWKp90IlQ/18KFbc9ZZAK2e70bYKBlpaBFhDMtkG2ZfkLZQCjhVgwFm/4JM7bmoiz2Rmc/lLOCrjzIY6saDnwlba975K8oto+FlaXU/5jr8YsU/c4TIIZU7g33hifEuA79KyvCPGIdIFtGe39JgaIMQKlLANIA62WZEMwxym4cpjMJcO4pph5QfVhvtFilbtjl0qLfkqAQ/2tMPVG5ymhot2WQcnoHfDIpfsk7PwWeYNtsSr/VpU90QwqcoRAdAcX0+GwBMBi01rT26S9GtItD3xzW3X0izJs1XXbpBKZCcKRcoBzHyb9cPTfJsz jorgekeles@CPX-JTI1HV9NQDP"#file(var.public_key_path) #TODO complete with your key
 }
 
 resource "aws_efs_file_system" "efs" {
@@ -153,7 +153,7 @@ module "auto_scaling" {
 
 
   # Auto scaling group
-  asg_name                  = "${var.vpc_name}auto_scaling_lc"
+  asg_name                  = "${var.vpc_name}-auto_scaling_lc"
   vpc_zone_identifier       = [module.vpc.public_subnets[0]]
   health_check_type         = "EC2"
   min_size                  = 2
@@ -179,7 +179,7 @@ module "elb_http" {
 
   name = "elb-nimbux"
 
-  subnets         = [module.vpc.public_subnets[0], module.vpc.public_subnets[1]]
+  subnets         = [module.vpc.public_subnets[0]]
   security_groups = [module.instance_sg.security_group_id]
   internal        = false
 
@@ -208,3 +208,5 @@ resource "aws_autoscaling_attachment" "asg_attachment_bar" {
   elb                    = module.elb_http.this_elb_id
 }
 
+
+ 
