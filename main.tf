@@ -97,7 +97,7 @@ module "efs_sg" {
 
 resource "aws_key_pair" "ec2key" {
   key_name   = var.public_key_name
-  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCotaFXhBfNDkXkpSc19j9m2vHAqWKp90IlQ/18KFbc9ZZAK2e70bYKBlpaBFhDMtkG2ZfkLZQCjhVgwFm/4JM7bmoiz2Rmc/lLOCrjzIY6saDnwlba975K8oto+FlaXU/5jr8YsU/c4TIIZU7g33hifEuA79KyvCPGIdIFtGe39JgaIMQKlLANIA62WZEMwxym4cpjMJcO4pph5QfVhvtFilbtjl0qLfkqAQ/2tMPVG5ymhot2WQcnoHfDIpfsk7PwWeYNtsSr/VpU90QwqcoRAdAcX0+GwBMBi01rT26S9GtItD3xzW3X0izJs1XXbpBKZCcKRcoBzHyb9cPTfJsz jorgekeles@CPX-JTI1HV9NQDP"#file(var.public_key_path) #TODO complete with your key
+  public_key = file(var.public_key_path) #TODO complete with your key
 }
 
 resource "aws_efs_file_system" "efs" {
